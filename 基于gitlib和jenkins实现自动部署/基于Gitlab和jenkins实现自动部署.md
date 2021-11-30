@@ -1604,6 +1604,12 @@ curl http://192.168.1.161:8080/job/linuxapp-app1-Develop/build?token=8a43650866f
 
 
 
+### 参数化构建
+
+
+
+
+
 ## 4.4 分布式服务
 
 在众多 Job 的场景下，单台 jenkins master 同时执行代码 clone、编译、打包及构建，其性能可能会出现瓶颈从而会影响代码部署效率，影响 jenkins 官方提供了 jenkins 分布式构建，将众多 job 分散运行到不同的 jenkins slave 节点，大幅提高并行 job 的处理能力。
@@ -2034,17 +2040,155 @@ root@localhost:/opt/sonarqube# systemctl status sonarqube.service
 
 ### 安装sonar-scanner扫描器
 
+sonarQube代码扫描功能是需要sonar-scanner软件进行实现的，需要单独下载程序
 
+下载地址：https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/
 
-
-
-需要被扫描的项目内需要定义sonar-project.properties文件
+官方文档：https://docs.sonarqube.org/latest/analysis/scan/sonarscanner/
 
 ```
-# 所描述信息
-# name 项目名称
-# 项目版本
+wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.6.2.2472-linux.zip
+# 解压
+unzip sonar-scanner-cli-4.6.2.2472-linux.zip
 ```
 
 
 
+### 生成tonken
+
+新版本服务器提交扫描结果需要进行安全认证，需要提前在服务生成token，并添加到扫描器的配置文件中
+
+点击我的账号-安全
+
+![image-20211130212149415](基于Gitlab和jenkins实现自动部署.assets/image-20211130212149415.png)
+
+
+
+服务配置
+
+```
+cd sonar-scanner-4.6.2.2472-linux/
+# 编辑
+vim conf/sonar-scanner.properties 
+sonar.host.url=http://192.168.1.119:9000	# 指定服务器位置
+sonar.login=3d4509b3ccd8ddda8b9526a05e2a1ecc3c5be671	# 生成的token
+sonar.sourceEncoding=UTF-8	# 指定编码
+
+# 配置软连接
+ln -s /usr/local/src/sonar-scanner-4.6.2.2472-linux/bin/sonar-scanner /usr/bin/
+
+```
+
+#### 关闭强制认证
+
+当然也可以进行关闭
+
+![image-20211130213307301](基于Gitlab和jenkins实现自动部署.assets/image-20211130213307301.png)
+
+
+
+### **测试代码**
+
+官网提供了测试用的程序,拿来直接用或者测试自己写的代码
+
+#### sonar-project.properties文件
+
+在运行sonar-scanner程序时，当前工作目录必须有一个sonar-project.properties文件，此文件中用于定义此次扫描任务的任务信息，包括测试版本，代码目录等。
+
+一般此文件都源码一起打包放到gitlab中
+
+```
+vim sonar-project.properties 
+sonar.projectKey=org.sonarqube:python-simple-sonar-scanner	# 描述信息
+sonar.projectName=Python :: Simple Project : SonarQube Scanner	# name 项目名称
+sonar.projectVersion=1.0	# 测试项目版本
+
+# Comma-separated paths to directories with sources (required)
+sonar.sources=src	# 代码所在目录（相对于此文件）
+
+# Language
+sonar.language=py	# 程序语言
+
+# Encoding of the source files
+sonar.sourceEncoding=UTF-8
+```
+
+运行扫描
+
+```
+ls
+-rw-r--r-- 1 root root  461 Jul 25  2016 README.md
+drwxr-xr-x 2 root root 4096 Nov 30 21:18 .scannerwork/
+-rw-r--r-- 1 root root  338 Jul 25  2016 sonar-project.properties
+drwxr-xr-x 5 root root 4096 Jul 25  2016 src/
+-rw-r--r-- 1 root root  290 Jul 25  2016 validation.txt
+
+sonar-scanner
+# 第一次运行会下载一堆插件
+NFO: Scanner configuration file: /usr/local/src/sonar-scanner-4.6.2.2472-linux/conf/sonar-scanner.properties
+INFO: Project root configuration file: /data/sonar-examples-master/projects/languages/python/python-sonar-runner/sonar-project.properties
+INFO: SonarScanner 4.6.2.2472
+INFO: Java 11.0.11 AdoptOpenJDK (64-bit)
+INFO: Linux 5.4.0-90-generic amd64
+...
+NFO: Analysis report uploaded in 621ms
+INFO: ANALYSIS SUCCESSFUL, you can browse http://192.168.1.119:9000/dashboard?id=org.sonarqube%3Apython-simple-sonar-scanner
+INFO: Note that you will be able to access the updated dashboard once the server has processed the submitted analysis report
+INFO: More about the report processing at http://192.168.1.119:9000/api/ce/task?id=AX1w_0OOWQUvS0v3vCoX
+# 运行完毕
+INFO: Analysis total time: 15.005 s
+INFO: ------------------------------------------------------------------------
+INFO: EXECUTION SUCCESS
+INFO: ------------------------------------------------------------------------
+INFO: Total time: 19.367s
+INFO: Final Memory: 7M/27M
+INFO: -------------------------------
+```
+
+登入服务器查看运行结果
+
+![image-20211130212600717](基于Gitlab和jenkins实现自动部署.assets/image-20211130212600717.png)
+
+
+
+## 5.4 jenkins进行代码扫描
+
+jenkins 安装 SonarQube 插件 ：
+
+插件管理中安装插件 SonarQube Scanner
+
+
+
+### 添加SonarQube
+
+Jenkins—系统管理—系统设置—SonarQube servers： 
+
+![image-20211130213845535](基于Gitlab和jenkins实现自动部署.assets/image-20211130213845535.png)
+
+### 添加Sonarscanner
+
+让 jenkins 添加 Sonarscanner 扫描器：
+
+系统管理-全局工作配置![image-20211130214353677](基于Gitlab和jenkins实现自动部署.assets/image-20211130214353677.png)
+
+
+
+### 构建扫描器
+
+选择自己的项目（linuxNN-job1-develop）-构建-execute sonarqube scanner，
+
+![image-20211130214933805](基于Gitlab和jenkins实现自动部署.assets/image-20211130214933805.png)
+
+将原本sonar-project.properties文件中配置扫描内容填入
+
+![image-20211130215251643](基于Gitlab和jenkins实现自动部署.assets/image-20211130215251643.png)
+
+==别忘了构建顺序要移一下，把他放在部署第一步，部署完了在测试就没意义了。==
+
+
+
+保存以后，点亮了一个新图标。
+
+![image-20211130215336793](基于Gitlab和jenkins实现自动部署.assets/image-20211130215336793.png)
+
+# 六、实战情况
