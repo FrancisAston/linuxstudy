@@ -926,6 +926,8 @@ output{
 
  web 服务器产生大量日志的场景，如果直接写入es可能速度过慢导致日志收集出现阻塞，一般写陷入redis缓存服务器,然后通过logstash读取后再写入es服务器
 
+redis需要2.6以上
+
 ### 安装并启动redis
 
 ```
@@ -960,9 +962,9 @@ OK
 
 将 tomcat 服务器的 logstash 收集之后的 tomcat 访问日志写入到 redis 服务器，然后通过另外的 logstash 将 redis 服务器的数据取出在写入到 elasticsearch 服务器。
 
-官 方 文 档 ： https://www.elastic.co/guide/en/logstash/current/plugins-outputs-redis.html
+官 方 文 档 ：https://www.elastic.co/guide/en/logstash/7.6/plugins-outputs-redis.html#plugins-outputs-redis-data_type
 
-配置我呢见
+具体配置
 
 ```
 vim /etc/logstash/conf.d/toredis.conf
@@ -1095,6 +1097,12 @@ redis_conn()
 
 
 
+## 使用kafka缓存
+
+
+
+**==使用logstash写入kafuka需要现将数据codec => json==**
+
 
 
 
@@ -1104,6 +1112,12 @@ redis_conn()
 logstash需要安装插件
 
 install logstash-output-jdbc
+
+
+
+==暂时掠过==
+
+
 
 # 四、kibana
 
@@ -1332,6 +1346,8 @@ output {
 
 
 
+# 六、其他功能
+
 ## 通过坐标地图统计客户IP所在城市
 
 通过客户端IP地址，通过GeoLite2-City库获取用户地理坐标，然后再kibana上使用地图工具进行画图
@@ -1397,4 +1413,48 @@ output{
 
 
 ![image-20211207233144246](ELK.assets/image-20211207233144246.png)
+
+
+
+
+
+# 配置优化
+
+内存问题：
+
+/etc/elasticearch/jvm.options	# 内存要调整，最好是宿主机的一半，最大最好不要超过30G
+
+/etc/logstash/jvm.options
+
+
+
+es:最少：4-8g。
+
+logstash：一般4G个内存就够差不多了
+
+内核优化：
+
+/etc/sysctl.conf
+
+/etc/security/limits.conf
+
+
+
+文件描述符和资源限制要调高，最好做好模板
+
+硬件设施：
+
+磁盘IO：	最好red10
+
+网络IO：
+
+
+
+# 注意事项：
+
+1.Index必须是小写，否则写不进去
+
+2.index 名称必须必须必须以 logstash开头,否则会画图失败
+
+
 

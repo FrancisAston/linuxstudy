@@ -1088,7 +1088,13 @@ This may also be found at: /var/lib/jenkins/secrets/initialAdminPassword
 ##### 通过 jar包方式启动
 
 ```
-jenkins： # java \ -Dcom.sun.management.jmxremote \ -Dcom.sun.management.jmxremote.port=12345 \ -Dcom.sun.management.jmxremote.authenticate=false \ -Dcom.sun.management.jmxremote.ssl=false \ -Djava.rmi.server.hostname="192.168.8.2 " \ -jar jenkins-2.138.3.war &
+jenkins： # java \
+ -Dcom.sun.management.jmxremote \
+ -Dcom.sun.management.jmxremote.port=12345 \ 
+ -Dcom.sun.management.jmxremote.authenticate=false \ 
+ -Dcom.sun.management.jmxremote.ssl=false \ 
+ -Djava.rmi.server.hostname="192.168.8.2 " \ 
+ -jar jenkins-2.138.3.war &
 ```
 
 ##### 通过tomcat方式启动
@@ -1531,10 +1537,12 @@ Gitlab Hook插件存在安全问题，安装后会出现一下提示，应为hoo
 
 ![image-20211129103004295](基于Gitlab和jenkins实现自动部署.assets/image-20211129103004295.png)
 
+
+
 高版本无法直接关闭，需要修改配置文件
 
 ```
- vim /etc/default/jenkins 
+vim /etc/default/jenkins 
 JAVA_ARGS="-Djava.awt.headless=true -Dhudson.security.csrf.GlobalCrumbIssuerConfiguration.DISABLE_CSRF_PROTECTION=true"
 # 重启服务
 systemctl restart jenkins
@@ -2191,4 +2199,137 @@ Jenkins—系统管理—系统设置—SonarQube servers：
 
 ![image-20211130215336793](基于Gitlab和jenkins实现自动部署.assets/image-20211130215336793.png)
 
-# 六、实战情况
+
+
+
+
+# 六、服务编译
+
+maven 部署准备：
+
+Maven 翻译为"专家"、"内行"，是 Apache 基金会旗下的一个纯 Java 开发的开源项目，Maven 是一个项目管理工具，可以对 Java 项目进行构建、解决打包依赖等。
+
+POM( Project Object Model，项目对象模型 ) 是 Maven 工程的基本工作单元，是一个 XML 文件，包含了项目的基本信息，用于描述项目如何构建，声明项目依赖等，在执行任务或目标时，Maven 会在当前目录中查找 pom 文件，通过读取 pom 文件获取所需的配置信息，然后执行目标。
+
+Pom 文件中可以指定以下配置：
+
+```
+- 项目依赖
+- 插件
+- 执行目标
+- 项目构建 profile
+- 项目版本
+- 项目开发者列表
+- 相关邮件列表信息
+```
+
+http://maven.apache.org/install.html
+
+http://mirrors.tuna.tsinghua.edu.cn/apache/maven #清华镜像源
+
+https://archive.apache.org/dist/maven/maven-3/ #官方各版本下载地址，推荐使用次新版本
+
+
+
+java 环境：
+
+Maven 是一个基于 Java 的工具所以服务器要安装 jdk 环境，版本要求如下：
+
+Maven 3.3 要求 JDK 1.7 或以上
+
+Maven 3.2 要求 JDK 1.6 或以上
+
+Maven 3.0/3.1 要求 JDK 1.5 或以上
+
+
+
+Maven 部署：
+
+```
+https://archive.apache.org/dist/maven/maven-3/3.6.2/binaries/apache-maven-3.6.2-bin.tar.gz
+tar xvf apache-maven-3.6.2-bin.tar.gz 
+
+# 环境变量
+root@tomcat-node1:/usr/local/src# vim /etc/profile.d/maven.sh
+export PATH=/usr/local/src/apache-maven-3.6.2/bin/:$PATH
+
+root@tomcat-node1:/usr/local/src# export PATH=/usr/local/src/apache-maven-3.6.2/bin/:$PATH
+
+# 测试一下是否可用
+root@tomcat-node1:/usr/local/src# mvn -v
+Apache Maven 3.6.2 (40f52333136460af0dc0d7232c0dc0bcf0d9e117; 2019-08-27T23:06:16+08:00)
+Maven home: /usr/local/src/apache-maven-3.6.2
+Java version: 1.8.0_202, vendor: Oracle Corporation, runtime: /usr/lib/jvm/jdk1.8.0_202/jre
+Default locale: en_US, platform encoding: UTF-8
+OS name: "linux", version: "5.4.0-90-generic", arch: "amd64", family: "unix
+```
+
+
+
+
+
+执行 java 代码编译：
+
+```
+Maven 的打包命令
+1.进入到包含有“pom.xml”的路径，执行：
+ mvn clean install package
+
+2.有的时候受到测试的干扰，导致无法正在进行编译，这时候可以选择跳过测试：
+ mvn clean install package -Dmaven.test.skip=true
+ " -Dmaven.test.skip=true"：跳过测试，并且不编译测试下的源代码；
+ "-DskipTests"：不执行测试，但是会进行测试代码的编译；
+ 
+3.如果需要编译的代码异常庞大，需要考虑对编译环境做一些处理，提成编译效率：
+ 启动多线程编译：mvn -T 4 clean install package -Dmaven.test.skip=true
+ 分配编译的CPU个数：mvn -T 2C clean install package -Dmaven.test.skip=true
+ 启用多线程编译：mvn clean install package -Dmaven.test.skip=true -Dmaven.compile.fork=true
+ 
+4.所有的Maven都是建立在JVM上的，所以进行编译的时候还需要考虑JVM参数优化：
+ 如果是 windows 找到“maven/bin/mvn.cmd”
+ 如果linux 找到“maven/bin/mvn”
+ # 里边有个配置项，可以调用$MAVEN_OPTS环境变量添加资源限制
+ MAVEN_OPTS="`concat_lines "$MAVEN_PROJECTBASEDIR/.mvn/jvm.config"` $MAVEN_OPTS"
+ 
+ vim /etc/profile
+ 追加一个配置项：export MAVEN_OPTS="-Xmx6g -Xms6g"
+ 使配置立即生效：source /etc/profile
+```
+
+
+
+常见报错：
+
+内存过小：
+
+```
+[ERROR] Killed
+
+
+服务器增加内存(推荐 4G 或以上)，避免被内核 OOM
+```
+
+网络问题：
+
+```
+[ERROR] npm ERR! code ELIFECYCLE
+[ERROR] npm ERR! errno 137
+[ERROR] npm ERR! dubbo-admin-ui@1.0.0 build: `node build/build.js`
+[ERROR] npm ERR! Exit status 137
+[ERROR] npm ERR! 
+[ERROR] npm ERR! Failed at the dubbo-admin-ui@1.0.0 build script
+
+# 解决方法
+
+# 服务器修改 node.js 源为淘宝源，加速资源下载，或者本地镜像
+root@web2:/opt/dubbo-admin# npm config get registry
+https://registry.npmjs.org/
+root@web2:/opt/dubbo-admin# npm config set registry 
+https://registry.npm.taobao.org
+```
+
+
+
+
+
+# 七、实战情况
