@@ -151,8 +151,8 @@ http.cors.allow-origin: "*"		# 允许所有地址
 ```
 vim config/jvm.options
 # 最好占用宿主机的50%
--Xms2g
--Xmx2g 
+-Xms4g
+-Xmx4g 
 
 # 内核限制和文件描述符占用一定要调大
 
