@@ -692,6 +692,8 @@ git checkout develop # 切换分支
 
 ![image-20211126233635686](基于Gitlab和jenkins实现自动部署.assets/image-20211126233635686.png)
 
+
+
 ### 2.8 gitlab数据备份和恢复
 
 #### 数据备份
