@@ -536,7 +536,13 @@ Password for 'http://wangda@192.168.1.253':
 Already up to date.
 ```
 
+
+
 #### git fetch
+
+
+
+
 
 #### git log 操作日志
 
@@ -616,6 +622,39 @@ cat .gitignore
 .\#*
 ```
 
+### git tag
+
+https://csfreebird.blog.csdn.net/article/details/48903213?spm=1001.2101.3001.6661.1&utm_medium=distribute.pc_relevant_t0.none-task-blog-2%7Edefault%7ECTRLIST%7Edefault-1.no_search_link&depth_1-utm_source=distribute.pc_relevant_t0.none-task-blog-2%7Edefault%7ECTRLIST%7Edefault-1.no_search_link&utm_relevant_index=1
+
+https://blog.csdn.net/nongminkouhao/article/details/106272776
+
+```
+在当前版本commit 添加tag号
+git tag 15213
+
+# 查看所有tag号
+root@pi-PowerEdge-R620:~/kubernetes# git tag
+15213
+v0.10.0
+v0.10.1
+v0.11.0
+v0.12.0
+
+
+# 查看最新的tag
+git describe --tags `git rev-list --tags --max-count=1`
+```
+
+切换到指定tag号
+
+```
+git checkout v0.19.3
+```
+
+
+
+
+
 #### git reset 回滚
 
 当项目提交遇到问题是，可以使用git reset命令进行项目回滚。git支持依次回滚到上一版本，或者直接回滚到指定版本。
@@ -630,7 +669,12 @@ git reset --hard HEAD^^ 	# git 版本回滚， HEAD 为当前版本，加一个^
 
 ```
 git reset --hard 5ae4b06 # 退到指定id的版本
+
+# 或者
+git checkout v0.19.3
 ```
+
+
 
 #### git reflog 版本号查询
 
@@ -814,20 +858,20 @@ Restore task is done.
 
 一般网站服务器避免权限问题都使用www用户来运行，为Tomcat创建用户
 
-```
+```bash
 groupadd -g 1200 www
 useradd -g 1200 -u 1200  -s /bin/bash  www
 ```
 
 安装脚本要用的程序包
 
-```
+```bash
 apt-get install net-tools
 ```
 
 创建代码目录
 
-```
+```bash
 mkdir /data/tomcat/applib -p #保存 web 压缩包
 mkdir /data/tomcat/appdir #保存解压后的web 目录
 mkdir /data/tomcat/webapps #tomcat app 目录
@@ -849,7 +893,7 @@ chown www.www /usr/local/apache-tomcat-8.5.42/  -R
 
 准备启动脚本
 
-```
+```bash
 vim /etc/init.d/tomcat
 #!/bin/bash
 JDK_HOME=/usr/lib/jvm/jdk1.8.0_202
@@ -972,7 +1016,7 @@ java版本：jdk-8u202
 
 #### 准备java环境
 
-```
+```bash
 root@localhost:/usr/src# ll jdk-8u202-linux-x64.tar.gz 
 -rw-r--r-- 1 root root 194042837 Nov 26 16:11 jdk-8u202-linux-x64.tar.gz
 
@@ -986,7 +1030,7 @@ ln -s /usr/local/jdk/bin/java /usr/bin/		# 一定要提前设好环境变量否�
 
 准备环境变量
 
-```
+```bash
 vim /etc/profile
 export JAVA_HOME=/usr/local/jdk
 export PATH=$JAVA_HOME/bin:$JAVA_HOME/jre/bin:$PATH
@@ -1097,6 +1141,16 @@ jenkins： # java \
  -Dcom.sun.management.jmxremote.ssl=false \ 
  -Djava.rmi.server.hostname="192.168.8.2 " \ 
  -jar jenkins-2.138.3.war &
+
+
+java -server -Xms1024m -Xmx1024m -Xss512k -jar jenkins2.319.1LTS.war  --webroot=/apps/jenkins/jenkins-data --httpPort=8080
+
+
+# 默认目录
+ /root/.jenkins"
+
+# 数据目录
+webroot=/apps/jenkins/jenkins-data
 ```
 
 ##### 通过tomcat方式启动
@@ -2205,7 +2259,7 @@ Jenkins—系统管理—系统设置—SonarQube servers：
 
 
 
-# 六、服务编译
+# 六、java编译
 
 maven 部署准备：
 
@@ -2335,3 +2389,89 @@ https://registry.npm.taobao.org
 
 
 # 七、实战情况
+
+```bash
+#/bin/bash
+  
+# script start time
+startime=`date +'%Y-%m-%d %H:%M:%S'`
+
+# 变量
+SHELL_DIR="/apps/jenkins/jenkins-data/myscripts"
+SHELL_NAME="$0"
+K8S_CONTROLLER1="192.168.1.3"
+K8S_CONTROLLER2="192.168.1.51"
+DATE=`date +%Y-%m-%d_%H_%M_%S`
+TAG=$3
+LASTTAG=''
+METHOD=$1
+Branch=$2
+
+if test -z $Branch;then
+  Branch=develop
+fi
+
+# 克隆代码
+function GitCode(){
+  GIT_URL="git@192.168.1.253:project1/myapp.git"
+  DIR_NAME=`echo ${GIT_URL} |awk -F "/" '{print $2}' | awk -F "." '{print $1}'` # myapp
+  DATA_DIR="/data/gitdata/project1"
+  GIT_DIR="${DATA_DIR}/${DIR_NAME}"
+  # 先清空之前的纪录
+  cd ${DATA_DIR} && echo "即将清空上一版本代码并获取当前分支最新代码" && rm -rf ${DIR_NAME}
+  echo "重新拉取${Branch}代码"
+
+  git clone -b ${Branch} ${GIT_URL} && echo “代码拉取完毕”
+  cd $GIT_DIR
+  commit=`git rev-list --tags --max-count=1`
+  LASTTAG=`git describe --tags ${commit}`
+
+  if test -z $TAG;then
+    echo "未设置tag，将使用最新版本$LASTTAG"
+    TAG=$LASTTAG
+  elif [ $TAG != $LASTTAG ];then
+    echo "将准备$TAG 版本镜像"
+    git checkout $TAG
+  fi
+  echo "更新k8s配置文件"
+    ssh root@${K8S_CONTROLLER1} "cd /data/k8sdata/yaml/project/project1/tomcat &&\
+    cp tomcat-app1.yaml old_version/ &&\
+    sed -Ei 's/(image: .*):.*/\1:${TAG}/' tomcat-app1.yaml &&\
+    kubectl  apply -f tomcat-app1.yaml --record "
+  echo "更新并部署完毕"
+  endtime=`date +'%Y-%m-%d %H:%M:%S'`
+  start_seconds=$(date --date="$starttime" +%s);
+  end_seconds=$(date --date="$endtime" +%s);
+  echo "本次业务镜像更新总计耗时："$((end_seconds-start_seconds))"s"
+}
+
+# 部署回滚
+function Rollbak(){
+  echo "回滚至之之前版本"
+  ssh root@${K8S_CONTROLLER1} "cd /data/k8sdata/yaml/project/project1/tomcat/old_version/ &&\
+  kubectl  apply -f tomcat-app1.yaml --record "
+  # 基于k8s版本管理回滚
+  #  ssh root@${K8S_CONTROLLER1}  "kubectl rollout undo deployment/project1-tomcat-app1-deployment  -n project1"
+
+}
+
+main(){
+  case ${METHOD}  in
+  deploy)
+  GitCode;
+  CompileCode;
+  CopyCode;
+  MakeImange;
+  Update_k8s;
+  ;;
+  rollback_last_version)
+  Rollbak;
+  ;;
+  *)
+  # usage;
+  esac;
+}
+
+main $1 $2 $3
+```
+

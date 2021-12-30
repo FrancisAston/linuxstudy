@@ -36,7 +36,7 @@ Kubernetes API server部署在master管理主机上，是整个k8s集群的数�
 
 ### kube-apiserver服务端口
 
-apiserver 目前在master监听两个端口
+apiserver在master监听两个端口
 
 
 
@@ -71,10 +71,10 @@ apiserver 目前在master监听两个端口
 Controller Manager 作为集群内部的管理控制中心，非安全默认端口10252，,负责集群内的Node、Pod 副本、服务端点（Endpoint）、命名空间（Namespace）、服务账号（ServiceAccount）、资源定额（ResourceQuota）的管理，当某个 Node 意外宕机时，Controller Manager 会及时发现并执行自动化修复流程，确保集群始终处于预期的工作状态。
 
 ```
+--horizontal-pod-autoscaler-sync-period duration
+# 检测pod资源占用情况间隔 The period for syncing the number of pods in horizontal pod autoscaler. (default 15s)
 
 ```
-
-
 
 
 
@@ -132,13 +132,12 @@ kube-proxy有三种调度模型：
 
 ```
 1.9引入到1.11正式版本，需要安装ipvsadm、ipset 工具包和加载 ip_vs 内核模块
-```
-
 
 
 lsmod| grep ip_vs
 
 apt install ipvsadm 	# 执行ipvsadm 一下，自动加载内核
+```
 
 
 
@@ -148,8 +147,6 @@ apt install ipvsadm 	# 执行ipvsadm 一下，自动加载内核
 --proxy-mode=ipvs
 --ipvs-scheduler=rr
 ```
-
-
 
 
 
@@ -807,13 +804,11 @@ See [Kubernetes](https://github.com/flannel-io/flannel/blob/master/Documentation
 
 ```
 wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
-# 这个网址俩边是个配置文件，里边有个默认的地址段需要修改成和当前pod地址段一致
 # 先给下载下来
-# 这个文件超级长
 vim kube-flannel.yml
   net-conf.json: |
     {
-      "Network": "10.10.0.0/16",
+      "Network": "10.10.0.0/16",	# 修改成和当前pod地址段一致
       "Backend": {
         "Type": "vxlan"
       }
@@ -895,6 +890,8 @@ test2	# 容器名称
 --replicas=5	# 创建个数
 ```
 
+
+
 删除容器
 
 容器是无法直接删除的，直接删除后。控制器会按照配置文件再次创建容器，需要直接删除控制器
@@ -964,8 +961,7 @@ PING www.baidu.com (39.156.66.14): 56 data bytes
 ```
 / # cat /etc/resolv.conf 
 nameserver 172.26.0.10	# DNS服务指向172.26.0.10，这个是什么东西呢
-search default.svc.cluster.local svc.cluster.local cluster.local
-options ndots:5
+
 
 查看service
 root@k8s-master-node1:~# kubectl get service -A
@@ -974,6 +970,10 @@ default       kubernetes   ClusterIP   172.26.0.1    <none>        443/TCP      
 kube-system   kube-dns     ClusterIP   172.26.0.10   <none>        53/UDP,53/TCP,9153/TCP   3h49m
 # 看来172.26.0.10是kube-dns服务，是由coredns提供的
 ```
+
+
+
+
 
 
 
@@ -1087,6 +1087,8 @@ csr-rszt7   62m   system:bootstrap:8yfu45   Approved,Issued
 ```
 
 8.通过 API 服务器安装一个 DNS 服务器 (CoreDNS) 和 kube-proxy 附加组件。 在 Kubernetes 版本 1.11 和更高版本中，CoreDNS 是默认的 DNS 服务器。 请注意，尽管已部署 DNS 服务器，但直到安装 CNI 时才调度它。
+
+
 
 
 
@@ -1322,6 +1324,21 @@ kubectl get endpoints	# 查看打开的端口
 
 
 
+导出配置文件
+
+```
+kubectl get deployment my-nginx -o yaml > /tmp/nginx.yaml
+vim /tmp/nginx.yaml
+
+
+kubectl apply -f /tmp/nginx.yaml
+deployment.apps/my-nginx configured
+```
+
+
+
+
+
 ### kubectl describe
 
 kubectl describe service  名字  -n Namespace	# 查看更具体的信息
@@ -1397,6 +1414,16 @@ root@nginx-6db489d4b7-plvp8:/#
 ### kubectl scale
 
 容器弹性伸缩使用
+
+```
+# 手动扩容
+kubectl scale deployment project1-tomcat-app1-deployment --replicas=3 -n project1
+deployment.apps/project1-tomcat-app1-deployment scaled
+
+# 自动扩容
+kubectl autoscale deployment  -n project1 --min=2 --max=5 project1-tomcat-app1-deployment --cpu-percent=60
+
+```
 
 
 
@@ -1494,7 +1521,7 @@ kubectl create -f file.yaml
 
 ### kubectl edit
 
-用于编辑资源对象，可以编辑pod service等，会以yaml格式展开
+用于编辑资源对象，可以编辑pod service等，命令会将配置以yaml格式展开
 
 ```
 kubectl edit namespace mynamespace
@@ -1535,7 +1562,17 @@ root@k8s-master-node2:~# kubectl top pod
 # 需要访问heapster服务的数据，我这没装
 Error from server (NotFound): the server could not find the requested resource (get services http:heapster:
 
-# 需要使用heapster服务收集状态，目前已经不用了,目前已经替换成了Metrics Server，我这里还没有装
+# 需要使用heapster服务收集状态，目前已经不用了,目前已经替换成了Metrics Server
+
+root@k8s-master-node1:/opt/kube/bin# kubectl top pod
+NAME                                CPU(cores)   MEMORY(bytes)   
+nginx-deployment-7f95d9fcf8-8kpmd   0m           6Mi             
+nginx-deployment-7f95d9fcf8-8rz2z   0m           6Mi             
+nginx-deployment-7f95d9fcf8-hsl8w   0m           6Mi             
+nginx-deployment-7f95d9fcf8-nv7qr   0m           27Mi            
+nginx-deployment-7f95d9fcf8-pjqch   0m           6Mi             
+nginx-deployment-7f95d9fcf8-qhttx   0m           6Mi             
+test2                               0m           1Mi 
 ```
 
 
@@ -1659,13 +1696,13 @@ yaml和json对比，在线yaml与json编辑器：http://www.bejson.com/validator
 
 ```
 cat nginx.yaml
-kind: Deployment #类型，是deployment控制器，kubectl explain Deployment
+kind: Deployment # 类型，是deployment控制器，kubectl explain Deployment
 apiVersion: extensions/v1beta1 #API版本，# kubectl explain Deployment.apiVersion
-metadata: #pod的元数据信息，kubectl explain Deployment.metadata
-  labels: #自定义pod的标签，# kubectl explain Deployment.metadata.labels
-    app: linux36-nginx-deployment-label #标签名称为app值为linux36-nginx-deployment-label， 后面会用到此标签
-  name: linux36-nginx-deployment #pod的名称
-  namespace: linux36 #pod的namespace，默认是defaule
+metadata: # pod的元数据信息，kubectl explain Deployment.metadata
+  labels: # 自定义pod的标签，# kubectl explain Deployment.metadata.labels
+    app: linux36-nginx-deployment-label # 标签名称为app值为linux36-nginx-deployment-label， 后面会用到此标签
+  name: linux36-nginx-deployment # pod的名称
+  namespace: linux36 # pod的namespace，默认是defaule
 spec: #定义deployment中容器的详细信息，kubectl explain Deployment.spec
   replicas: 1 #创建出的pod的副本数，即多少个pod，默认值为1
   selector: #定义标签选择器
@@ -1848,7 +1885,7 @@ Ready
 
 探针是由 kubelet 对容器执行的定期诊断，以保证Pod的状态始终处于运行状态，要执行诊断，kubelet 调用由容
 
-器实现的Handler，有三种类型的处理程序：
+器实现的Handler，有3种类型的处理程序：
 
 ```
 ExecAction 
@@ -1891,19 +1928,143 @@ https://kubernetes.io/zh/docs/tasks/confifigure-pod-container/confifigure-livene
 
 探针有很多配置字段，可以使用这些字段精确的控制存活和就绪检测的行为：
 
+```
+initialDelaySeconds: 120
+#初始化延迟时间，告诉kubelet在执行第一次探测前应该等待多少秒，默认是0秒，最小值是0
+
+periodSeconds: 60
+#探测周期间隔时间，指定了kubelet应该每多少秒秒执行一次存活探测，默认是 10 秒。最小值是 1
+
+timeoutSeconds: 5
+#单次探测超时时间，探测的超时后等待多少秒，默认值是1秒，最小值是1。
+
+successThreshold: 1
+#从失败转为成功的重试次数，探测器在失败后，被视为成功的最小连续成功数，默认值是1，存活探测的这个值必须是 1，最小值是 1。
+
+failureThreshold： 3
+#从成功转为失败的重试次数，当Pod启动了并且探测到失败，Kubernetes的重试次数，存活探测情况下的放弃就意味 着重新启动容器，就绪探测情况下的放弃Pod 会被打上未就绪的标签，默认值是3，最小值是1。
+
+
+# HTTP 探测器可以在 httpGet 上配置额外的字段
+
+host: 
+#连接使用的主机名，默认是Pod的 IP，也可以在HTTP头中设置 “Host” 来代替。
+
+scheme: http 
+#用于设置连接主机的方式（HTTP 还是 HTTPS），默认是 HTTP。
+
+path: /monitor/index.html
+#访问 HTTP 服务的路径
+
+httpHeaders:
+#请求中自定义的 HTTP 头,HTTP 头字段允许重复。
+
+port: 80
+#访问容器的端口号或者端口名，如果数字必须在 1 ～ 65535 之间
+```
 
 
 
+探针示例：
 
-(之后补上)
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels: #rs or deployment
+      app: ng-deploy-80
+    template:
+      metadata:
+        labels:
+          app: ng-deploy-80
+      spec:
+        containers:
+        - name: ng-deploy-80
+          image: nginx:1.17.5
+          ports:
+          - containerPort: 80
+          #readinessProbe:	# 2中探针类型
+          livenessProbe:
+            httpGet:	# http探针
+              #path: /monitor/monitor.html
+              path: /index.html
+              port: 80
+              initialDelaySeconds: 5
+              periodSeconds: 3
+              timeoutSeconds: 5
+              successThreshold: 1
+              failureThreshold: 3
+            tcpSocket:
+              port: 80
+              initialDelaySeconds: 5
+              periodSeconds: 3
+              timeoutSeconds: 5
+              successThreshold: 1
+              failureThreshold: 3
+            exec:	# ExecAction探针
+              command:
+              - /usr/local/bin/redis-cli
+              - quit
+              initialDelaySeconds: 5
+              periodSeconds: 3
+              timeoutSeconds: 5
+              successThreshold: 1
+              failureThreshold: 3
+```
+
+如果端口检测连续超过指定的三次都没有通过，则Pod状态被标记为CrashLoopBackOff
+
+![image-20211220201314375](kubernetes基础.assets/image-20211220201314375.png)
 
 
 
-### HPA控制器
+livenessProbe和readinessProbe的对比
+
+```
+livenessProbe :
+1.连续探测失败会重启、重建pod，readinessProbe不会执行重启或者重建Pod操作
+2.连续检测指定次数失败后会将容器置于(Crash Loop BackOff)切不可用，readinessProbe不会
+
+readinessProbe:
+1.连续探测失败会从service的endpointd中删除该Pod，livenessProbe不具备此功能但是 会将容器挂起livenessProbe
+
+livenessProbe用户控制是否重启pod，readinessProbe用于控制pod是否添加至service
+```
+
+==建议：两个探针同时配置== 
 
 
 
+Pod重启策略：
 
+k8s在Pod出现异常的时候会自动将Pod重启以恢复Pod中的服务。
+
+```
+restartPolicy： 
+Always：当容器异常时，k8s自动重启该容器，ReplicationController/Replicaset/Deployment。 
+OnFailure：当容器失败时(容器停止运行且退出码不为0)，k8s自动重启该容器。 
+Never：不论容器运行状态如何都不会重启该容器,Job或CronJob。
+```
+
+```
+containers:
+- name: magedu-tomcat-app1-container
+  image: harbor.magedu.local/magedu/tomcat-app1:v1
+  imagePullPolicy: Always
+  ports:
+  - containerPort: 8080
+    protocol: TCP
+    name: http
+restartPolicy: Always 
+```
+
+
+
+### 单个POD内部署多个容器
 
 
 
@@ -1950,13 +2111,15 @@ k8s中存在多种控制器
 
 
 
-### Statefulse
+### Statefulse（有状态服务）
 
 [StatefulSets | Kubernetes](https://kubernetes.io/zh/docs/concepts/workloads/controllers/statefulset/)
 
+StatefulSet 是用来管理有状态应用的工作负载 API 对象。
 
 
-### DaemonSet
+
+### DaemonSet（无状态服务）
 
 [DaemonSet | Kubernetes](https://kubernetes.io/zh/docs/concepts/workloads/controllers/daemonset/)
 
@@ -1972,6 +2135,132 @@ DaemonSet 的一些典型用法：
 
 
 
+### HPA控制器
+
+kubectl autoscale 自动控制在k8s集群中运行的pod数量(水平自动伸缩)，需要提前设置pod范围及触发条件。
+
+k8s从1.1版本开始增加了名称为HPA(Horizontal Pod Autoscaler)的控制器，用于实现基于pod中资源(CPU/Memory)利用率进行对pod的自动扩缩容功能的实现，早期的版本只能基于Heapster组件实现对CPU利用率做为触发条件，但是在k8s 1.11版本开始使用Metrices Server完成数据采集，然后将采集到的数据通过API（Aggregated API，汇总API），例如metrics.k8s.io、custom.metrics.k8s.io、external.metrics.k8s.io，然后再把数据提供给HPA控制器进行查询，以实现基于某个资源利用率对pod进行扩缩容的目的。
+
+```
+控制管理器默认每隔15s（可以通过–horizontal-pod-autoscaler-sync-period修改）查询metrics的资源使用情况
+支持以下三种metrics指标类型：
+	->预定义metrics（比如Pod的CPU）以利用率的方式计算
+	->自定义的Pod metrics，以原始值（raw value）的方式计算
+	->自定义的object metrics
+支持两种metrics查询方式：
+->Heapster
+->自定义的REST API 
+支持多metric
+```
+
+
+
+准备metrics-server
+
+```
+https://github.com/kubernetes-incubator/metrics-server
+git clone https://github.com/kubernetes-incubator/metrics-server.git
+cd metrics-server/
+
+# 准备image
+# 里边的给的imgage地址时google的，无法下载可以使用国内镜像
+docker pull k8s.gcr.io/metrics-server-amd64:v0.3.5 #google镜像仓库
+docker pull registry.cn-hangzhou.aliyuncs.com/google_containers/metrics-server- amd64:v0.3.5 #阿里云镜像仓库
+
+# 修改yml文件镜像
+vim ./manifests/base/deployment.yaml
+# 改一下镜像
+
+kubectl apply -f ./manifests/base/deployment.yaml
+```
+
+测试是否能够收到数据
+
+```
+root@k8s-master-node1:/opt/kube/bin# kubectl top pod
+NAME                                CPU(cores)   MEMORY(bytes)   
+nginx-deployment-7f95d9fcf8-8kpmd   0m           6Mi             
+nginx-deployment-7f95d9fcf8-8rz2z   0m           6Mi             
+nginx-deployment-7f95d9fcf8-hsl8w   0m           6Mi             
+nginx-deployment-7f95d9fcf8-nv7qr   0m           27Mi            
+nginx-deployment-7f95d9fcf8-pjqch   0m           6Mi             
+nginx-deployment-7f95d9fcf8-qhttx   0m           6Mi     
+
+# 没问题下一步
+```
+
+
+
+修改controller-manager启动参数：
+
+```
+kube-controller-manager --help | grep horizontal-pod-autoscaler-sync-period
+--horizontal-pod-autoscaler-sync-period duration 
+#  The period for syncing the number of pods in horizontal pod autoscaler. (default 15s)
+# 定义pod数量水平伸缩的间隔周期，默认15秒
+
+vim /etc/systemd/system/kube-controller-manager.service
+--horizontal-pod-autoscaler-use-rest-clients=true \ # 是否使用其他客户端数据
+--horizontal-pod-autoscaler-sync-period=10s \ # 可选项目，定义数据采集周期间隔时间
+
+# 重启服务
+
+```
+
+用于autoscale命令自动pod自动伸缩
+
+```
+# 手动创建自动扩容
+kubectl autoscale deployment  -n project1 --min=2 --max=5 project1-tomcat-app1-deployment --cpu-percent=60
+
+
+# 系统会创建一个HPA控制器
+kubectl get horizontalpodautoscalers.autoscaling -A
+NAMESPACE   NAME                              REFERENCE                                    TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+project1    project1-tomcat-app1-deployment   Deployment/project1-tomcat-app1-deployment   1%/60%    2         5         2          36m
+```
+
+
+
+HPA控制器优先级高于Deployments，副本数将按照HPA设置的数量进行变化，不在按照Deployments副本数部署
+
+
+
+使用yaml文件创建HPA控制器
+
+```
+apiVersion: autoscaling/v1 #定义API版本
+kind: HorizontalPodAutoscaler #对象类型
+metadata: #定义对象元数据
+  namespace: linux36 #创建后隶属的namespace
+  name: linux36-tomcat-app1-podautoscaler #对象名称
+  labels: 这样的label标签
+    app: linux36-tomcat-app1 #自定义的label名称
+    version: v2beta1 #自定义的api版本
+spec: #定义对象具体信息
+  scaleTargetRef: #定义水平伸缩的目标对象，Deployment、ReplicationController/ReplicaSet
+    apiVersion: apps/v1
+    #API版本，HorizontalPodAutoscaler.spec.scaleTargetRef.apiVersion
+    kind: Deployment #目标对象类型为deployment
+    name: linux36-tomcat-app1-deployment #deployment 的具体名称
+  minReplicas: 2 #最小pod数
+  maxReplicas: 5 #最大pod数
+  targetCPUUtilizationPercentage：60 	# cpu阀值
+
+# 一下是老版本，现在已经废弃
+metrics: #调用metrics数据定
+- type: Resource #类型为资源
+  resource: #定义资源
+    name: cpu #资源名称为cpu
+    targetAverageUtilization: 80 #CPU使用率
+  - type: Resource #类型为资源
+    resource: #定义资源
+      name: memory #资源名称为memory
+      targetAverageValue: 1024Mi #memory使用率
+```
+
+
+
 ## Service 
 
 [Kubernetes Service _ Kubernetes(K8S)中文文档_Kubernetes中文社区](http://docs.kubernetes.org.cn/703.html)
@@ -1983,6 +2272,12 @@ Service 服务可以通过pod设置的标记进项关联，通过标签查找对
 k8s不会对pod进行直接访问，应为pod随时都在动态的创建和注销，没有确定的地址，需要借助server服务在对pod进行转发。
 
 
+
+调用server默认不能跨namespace，如果需要跨域调用，需要写完整的域名
+
+project1-tomcat-app1-service.project1.svc.cluster.local
+
+==service名.namespace名.svc.k8s集群域名后缀==
 
 ### kube-proxy和service的关系
 
@@ -2312,11 +2607,512 @@ spec:
 
 
 
-# k8s组件
+### PV和PVC
+
+管理存储是管理计算的一个明显问题。该PersistentVolume子系统为用户和管理员提供了一个API，用于抽象如何根据消费方式提供存储的详细信息。为此，我们引入了两个新的**API资源**：PersistentVolume和PersistentVolumeClaim
+
+　　PersistentVolume（**PV**）是集群中由管理员配置的**一段网络存储**。 它是集群中的资源，就像节点是集群资源一样。 PV是容量插件，如Volumes，但其生命周期独立于使用PV的任何单个pod。 此API对象捕获存储实现的详细信息，包括NFS，iSCSI或特定于云提供程序的存储系统。
+
+　　PersistentVolumeClaim（**PVC**）是由**用户进行存储的请求**。 它类似于pod。 Pod消耗节点资源，PVC消耗PV资源。Pod可以请求特定级别的资源（CPU和内存）。声明可以请求特定的大小和访问模式（例如，可以一次读/写或多次只读）。
+
+　　虽然PersistentVolumeClaims允许用户使用抽象存储资源，但是PersistentVolumes对于不同的问题，用户通常需要具有不同属性（例如性能）。群集管理员需要能够提供各种PersistentVolumes不同的方式，而不仅仅是大小和访问模式，而不会让用户了解这些卷的实现方式。对于这些需求，有**StorageClass 资源。**
+
+　　StorageClass为管理员提供了一种描述他们提供的存储的“类”的方法。 不同的类可能映射到服务质量级别，或备份策略，或者由群集管理员确定的任意策略。 Kubernetes本身对于什么类别代表是不言而喻的。 这个概念有时在其他存储系统中称为“配置文件”。
+
+　　**PVC和PV是一一对应的。**
+
+#### **生命周期**
+
+　PV是群集中的资源。PVC是对这些资源的请求，并且还充当对资源的检查。PV和PVC之间的相互作用遵循以下生命周期：
+
+Provisioning ——-> Binding ——–>Using——>Releasing——>Recycling
+
+- 供应准备Provisioning
+
+  ---通过集群外的存储系统或者云平台来提供存储持久化支持。
+
+  -  \- 静态提供Static：集群管理员创建多个PV。 它们携带可供集群用户使用的真实存储的详细信息。 它们存在于Kubernetes API中，可用于消费
+  -  \- 动态提供Dynamic：当管理员创建的静态PV都不匹配用户的PersistentVolumeClaim时，集群可能会尝试为PVC动态配置卷。 此配置基于StorageClasses：PVC必须请求一个类，并且管理员必须已创建并配置该类才能进行动态配置。 要求该类的声明有效地为自己禁用动态配置。
+
+-  **绑定Binding**---用户创建pvc并指定需要的资源和访问模式。在找到可用pv之前，pvc会保持未绑定状态。
+
+-  **使用Using**---用户可在pod中像volume一样使用pvc。
+
+-  **释放Releasing**---用户删除pvc来回收存储资源，pv将变成“released”状态。由于还保留着之前的数据，这些数据需要根据不同的策略来处理，否则这些存储资源无法被其他pvc使用。
+
+- 回收Recycling
+
+  ---pv可以设置三种回收策略：保留（Retain），回收（Recycle）和删除（Delete）。
+
+  -  \- 保留策略：允许人工处理保留的数据。
+  -  \- 删除策略：将删除pv和外部关联的存储资源，需要插件支持。
+  -  \- 回收策略：将执行清除操作，之后可以被新的pvc使用，需要插件支持。
+
+ 注：目前只有NFS和HostPath类型卷支持回收策略，AWS EBS,GCE PD,Azure Disk和Cinder支持删除(Delete)策略。
+
+### PV类型
+
+支持N多种存储，我这里使用nfs作为测试
+
+-  GCEPersistentDisk
+-  AWSElasticBlockStore
+-  AzureFile
+-  AzureDisk
+-  FC (Fibre Channel)
+-  Flexvolume
+-  Flocker
+-  NFS
+-  iSCSI
+-  RBD (Ceph Block Device)
+-  CephFS
+-  Cinder (OpenStack block storage)
+-  Glusterfs
+-  VsphereVolume
+-  Quobyte Volumes
+-  HostPath (Single node testing only – local storage is not supported in any way and WILL NOT WORK in a multi-node cluster)
+-  Portworx Volumes
+-  ScaleIO Volumes
+-  StorageOS
+
+下面我们定义一个PV的YAML文件：
+
+```
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: my-pv01
+  labels:
+    storage: pv
+spec:
+  accessModes:	# 访问模式
+  - ReadWriteOnce	# 表示具有读写权限，但是只能被一个node挂载一次
+  # ReadOnlyMany 表示具有只读权限，可以被多个node多次挂载
+  # ReadWriteMany：表示具有读写权限，可以被多个node多次挂载
+  capacity:	# 持久卷资源和容量的描述，存储大小是唯一可设置或请求的资源
+    storage: 1Gi	# 存储大小
+  persistentVolumeReclaimPolicy: Recycle	# 回收策略，也就是释放持久化卷时的策略，一共有一下几种
+  # Retain：保留数据，如果要清理需要手动清理数据，默认的策略；
+  # Delete：删除，将从Kubernetes中删除PV对象，以及外部基础设施中相关的存储资产，比如AWS EBS, GCE PD, Azure Disk, 或Cinder volume；
+  # Recycle：回收，清楚PV中的所有数据，相当于执行rm -rf /pv-volume/*；
+  nfs:	# 协议
+    path: /data/k8s	# 存储共享的目录
+    server: 172.16.1.128	# nfs服务器地址
+
+kubectl create -f pv01-daemo.yaml
+```
+
+
+
+然后观察其PV：
+
+```
+root@k8s-master-node1:~# kubectl get persistentvolume
+NAME                     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM                              STORAGECLASS   REASON   AGE
+my-pv01                  10Gi       RWO            Recycle          Available                                                              4s
+zookeeper-datadir-pv-1   20Gi       RWO            Retain           Bound       project1/zookeeper-datadir-pvc-1                           4h51m
+zookeeper-datadir-pv-2   20Gi       RWO            Retain           Bound       project1/zookeeper-datadir-pvc-2                           4h51m
+zookeeper-datadir-pv-3   20Gi       RWO            Retain           Bound       project1/zookeeper-datadir-pvc-3                           4h51m
+```
+
+PV的状态说明：
+
+- Available（可用）：表示可用状态，还未被任何 PVC 绑定
+- Bound（已绑定）：表示 PVC 已经被 PVC 绑定
+- Released（已释放）：PVC 被删除，但是资源还未被集群重新声明
+- Failed（失败）： 表示该 PV 的自动回收失败
+
+
+
+### PVC
+
+于上节创建的PV，我们来创建PVC，创建PVC所用的类型是PersistentVolumeClaim，其apiVersion为v1，具体帮助文档可以通过kubectl explain PersistentVolumeClaim来查看。
+
+
+
+我们定义PVC的YAML文件，如下：
+
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-test
+spec:
+  accessModes:
+  - ReadWriteOnce	# 表示具有读写权限，但是只能被一个node挂载一次
+  # ReadOnlyMany 表示具有只读权限，可以被多个node多次挂载
+  # ReadWriteMany：表示具有读写权限，可以被多个node多次挂载
+  resources:	# 主要定义卷应该拥有的最小资源
+    requests:
+      storage: 1Gi
+      
+spec参数说明：
+（3）、dataSource：定义如果提供者具有卷快照功能，就会创建卷，并将数据恢复到卷中，反之不创建
+（4）、selector：定义绑定卷的标签查询
+（5）、storageClassName：定义的storageClass的名字，PV 与 PVC 的 storageclass 类名必须相同（或同时为空）。
+（6）、volumeMode：主要定义 volume 是文件系统（FileSystem）类型还是块（Block）类型，PV 与 PVC 的 VolumeMode 标签必须相匹配。
+（7）、volumeName：需要绑定的PV的名称链接
+```
+
+默认情况下pvc会根据requests的磁盘大小自动去寻找适合大小的pv并进行绑定，并且会占据pv所有磁盘空间，一个PV只能允许一个PVC绑定。
+
+
+
+pvc绑定pv
+
+```
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-test
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeName: pvc-test	# 绑定pv的名字
+  resources:
+    requests:
+      storage: 1Gi
+```
+
+
+
+### Storageclass
+
+https://zhuanlan.zhihu.com/p/104555373
+
+上面介绍的PV和PVC模式是需要运维人员先创建好PV，然后开发人员定义好PVC进行一对一的Bond，但是如果PVC请求成千上万，那么就需要创建成千上万的PV，对于运维人员来说维护成本很高，Kubernetes提供一种自动创建PV的机制，叫StorageClass，它的作用就是创建PV的模板。
+
+![image-20211222225944470](kubernetes基础.assets/image-20211222225944470.png)
 
 
 
 
+
+
+
+# NODE 标签
+
+```
+root@pi-PowerEdge-R620:~# kubectl label node 192.168.1.53 project=project1
+node/192.168.1.53 labeled
+root@pi-PowerEdge-R620:~# kubectl label node 192.168.1.54 project=project1
+node/192.168.1.54 labeled
+
+```
+
+通过筛选器选择指定的node节点
+
+```
+# 添加位置deployments.spec.template.spec.nodeSelector
+nodeSelector:
+  project: project1
+```
+
+
+
+删除标签
+
+```
+kubectl label nodes 192.168.1.54 project-
+node/192.168.1.54 labeled
+```
+
+
+
+
+
+# 升级和回滚
+
+
+
+代码升级
+
+```
+# 通过重新指定镜像
+kubectl apply -f tomcat-app1/tomcat-app1.yaml --record=true	# 添加升级标签记录
+
+
+# 之后升级可以直接重新指定镜像
+root@k8s-master-node1:~# kubectl -n project1 set image deployment/project1-tomcat-app1-deployment project1-tomcat-app1-container=local.harbor.com/project1/tomcat-app1:v3
+deployment.apps/project1-tomcat-app1-deployment image updated
+#  kubectl 指定命名空间 set image 控制器类型/控制器名称 容器名称=镜像地址
+
+# 或者直接修改yml对应的镜像版本文件
+```
+
+
+
+**查看历史版本信息：**
+
+```
+root@k8s-master-node1:/opt/k8s-data/yaml/project1# kubectl rollout history -n project1 deployment project1-tomcat-app1-deployment 
+deployment.apps/project1-tomcat-app1-deployment 
+REVISION  CHANGE-CAUSE
+2         kubectl apply --filename=tomcat-app1.yaml --record=true
+3         kubectl apply --filename=tomcat-app1.yaml --record=true
+4         kubectl apply --filename=tomcat-app1/tomcat-app1.yaml --record=true
+```
+
+
+
+**回滚到上一个版本：**
+
+```
+kubectl rollout undo -n project1 deployment project1-tomcat-app1-deployment 
+
+# 仅支持现在和之前2个版本来回切换
+```
+
+**回滚到指定版本：**
+
+```
+查看当前版本号：
+root@k8s-master-node1:/opt/k8s-data/yaml/project1# kubectl rollout history -n project1 deployment project1-tomcat-app1-deployment 
+deployment.apps/project1-tomcat-app1-deployment 
+REVISION  CHANGE-CAUSE
+2         kubectl apply --filename=tomcat-app1.yaml --record=true
+3         kubectl apply --filename=tomcat-app1.yaml --record=true
+4         kubectl apply --filename=tomcat-app1/tomcat-app1.yaml --record=true
+
+kubectl rollout undo -n project1 deployment project1-tomcat-app1-deployment --to-revision=2
+```
+
+
+
+
+
+# ETCD数据库
+
+
+
+数据备份和恢复
+
+# k8s网络组件
+
+## calico
+
+官网：https://www.projectcalico.org/
+
+Calico是一个纯三层的网络解决方案，为容器提供多node间的访问通信，calico将每一个node节点都当做为一个路由器(router)，各节点通过BGP(Border Gateway Protocol) 边界网关协议学习并在node节点生成路由规则，从而将不同node节点上的pod连接起来进行通信。
+
+Calico是基于路由表转发数据，性能较高（比flannel速度快）
+
+
+
+BGP是一个去中心化的协议，它通过自动学习和维护路由表实现网络的可用性，但是并不是所有的网络都支持BGP，另外为了跨网络实现更大规模的网络管理，calico 还支持IP-in-IP的叠加模型，简称IPIP。
+
+IPIP可以实现跨不同网段建立路由通信，但是会存在安全性问题，其在内核内置，可以通过Calico的配置文件设置是否启用IPIP，在公司内部如果k8s的node节点没有跨越网段建议关闭IPIP。 
+
+```
+IPIP是一种将各Node的路由之间做一个tunnel，再把两个网络连接起来的模式。
+启用IPIP模式时，Calico将在各 Node上创建一个名为"tunl0"的虚拟网络接口。
+BGP模式则直接使用物理机作为虚拟路由路（vRouter），不再创建额外的tunnel
+```
+
+核心组件
+
+```
+Felix：calico的agent，运行在每一台node节点上，其主要是维护路由规则、汇报当前节点状态以确保pod的夸主机 通信。
+
+BGP Client：每台node都运行，其主要负责监听node节点上由felix生成的路由信息，然后通过BGP协议广播至其他剩 余的node节点，从而相互学习路由实现pod通信。
+
+Route Reflector：集中式的路由反射器，calico v3.3开始支持，当Calico BGP客户端将路由从其FIB(Forward Information dataBase，转发信息库)通告到Route Reflector时，Route Reflector会将这些路由通告给部署 集群中的其他节点，Route Reflector专门用于管理BGP网络路由规则，不会产生pod数据通信。
+
+注：calico默认工作模式是BGP的node-to-node mesh，如果要使用Route Reflector需要进行相关配置。
+https://docs.projectcalico.org/v3.4/usage/routereflector
+https://docs.projectcalico.org/v3.2/usage/routereflector/calico-routereflector
+```
+
+
+
+[部署Kubernetes (tigera.io)](https://projectcalico.docs.tigera.io/getting-started/kubernetes/)
+
+![image-20211220205225320](kubernetes基础.assets/image-20211220205225320.png)
+
+查看calico组件的数据流向：
+
+开启ipip会创建tunl0网卡，所有pod路由地址都会写到路由表中
+
+![image-20211220205529112](kubernetes基础.assets/image-20211220205529112.png)
+
+数据通过tunl0网卡进行转发，相比普通模式多了一层封装
+
+![image-20211220205538122](kubernetes基础.assets/image-20211220205538122.png)
+
+
+
+
+
+关闭ipip：
+
+![image-20211220205459934](kubernetes基础.assets/image-20211220205459934.png)
+
+路由追踪：
+
+```
+root@k8s-master1:/etc/ansible# kubectl exec -it net-test1-68898c85b7-qrh7b sh
+/ # traceroute 172.31.58.65
+traceroute to 172.31.58.65 (172.31.58.65), 30 hops max, 46 byte packets
+1 192.168.7.111 (192.168.7.111) 0.009 ms 0.008 ms 0.004 ms	# 从本地网卡直接发出
+2 192.168.7.110 (192.168.7.110) 0.282 ms 0.344 ms 0.145 ms	# 到达目标node网卡
+3 172.31.58.65 (172.31.58.65) 0.481 ms 0.363 ms 0.197 ms	# 直接到达目标pod地址
+```
+
+
+
+
+
+## flannel
+
+官网：https://coreos.com/flflannel/docs/latest/
+
+文档：https://coreos.com/flflannel/docs/latest/kubernetes.html
+
+由CoreOS开源的针对k8s的网络服务，其目的为解决k8s集群中各主机上的pod相互通信的问题，其借助于etcd维
+
+护网络IP地址分配，并为每一个node服务器分配一个不同的IP地址段。
+
+
+
+flannel相关文件
+
+```
+root@k8s-worker-node1:~# find / -name flannel
+/run/flannel
+/opt/kube/bin/flannel
+/var/lib/cni/flannel
+/var/lib/docker/overlay2/37de864902f0a668d92580404bc4fa8ff14b06c8c241c2be05514dda19ae823f/diff/run/flannel
+/var/lib/docker/overlay2/37de864902f0a668d92580404bc4fa8ff14b06c8c241c2be05514dda19ae823f/merged/run/flannel
+```
+
+
+
+flannel会把k8s中设置的pods网段进行划分，没个node会管理一个地址段
+
+```
+root@k8s-worker-node1:~# cat /run/flannel/subnet.env 
+FLANNEL_NETWORK=172.20.0.0/16
+FLANNEL_SUBNET=172.20.5.1/24	# 每个node节点都会分配一个网段，默认24掩码
+FLANNEL_MTU=1450
+FLANNEL_IPMASQ=true
+```
+
+**172.20.5.1/24地址被当前node节点上所有pod作为网关**
+
+```
+# 进入此node节点的pod，查看网关
+root@nginx-deployment-7f95d9fcf8-nv7qr:/# ip route show
+default via 172.20.5.1 dev eth0 
+172.20.0.0/16 via 172.20.5.1 dev eth0 
+172.20.5.0/24 dev eth0 proto kernel scope link src 172.20.5.9 
+```
+
+ cni0网卡：
+
+是个桥接网卡，没个node上都有一个
+
+```
+7: cni0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UP group default qlen 1000
+    link/ether 6e:5b:a2:5d:6b:06 brd ff:ff:ff:ff:ff:ff
+    inet 172.20.5.1/24 brd 172.20.5.255 scope global cni0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::6c5b:a2ff:fe5d:6b06/64 scope link 
+       valid_lft forever preferred_lft forever
+
+这个网卡作为桥接设备，将容器的网络流量转发给flannel，然后flannel对目标主机地址去etcd中查询，然后封装数据包使用VXLAN直接转发至目标主机位置
+```
+
+
+
+共有3中网络模型
+
+```
+FLANNEL_BACKEND: "host-gw" :也就是Host GateWay，通过在node节点上创建到达各目标容器地址的路由表而完成报文的转发，因此这种 方式要求各node节点本身必须处于同一个局域网(二层网络)中，因此不适用于网络变动频繁或比较大型的网络环境，但是 其性能较好。
+
+FLANNEL_BACKEND: "vxlan" :Linux内核在在2012年底的v3.7.0之后加入了VXLAN协议支持，因此新版本的Flannel也有UDP转换为 VXLAN，VXLAN本质上是一种tunnel（隧道）协议，用来基于3层网络实现虚拟的2层网络，目前flannel 的网络模型已 经是基于VXLAN的叠加(覆盖)网络
+
+FLANNEL_BACKEND: "UDP":早期版本的Flannel使用UDP封装完成报文的跨越主机转发，其安全性及性能略有不足。
+```
+
+
+
+vxlan模式通讯流程：
+
+
+
+flannel.1网卡：
+
+flannel.1是overlay网络的设备，用来进行vxlan报文的处理（封包和解包），不同node之间的pod数据流量都从 overlay设备以隧道的形式发送到对端。
+
+```
+root@k8s-worker-node1:~# ip link show type vxlan
+5: flannel.1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UNKNOWN mode DEFAULT group default 
+    link/ether 6a:6e:1f:0c:54:d1 brd ff:ff:ff:ff:ff:ff
+```
+
+
+
+数据转发过程
+
+```
+root@nginx-deployment-7f95d9fcf8-nv7qr:/# traceroute 172.20.3.9
+traceroute to 172.20.3.9 (172.20.3.9), 30 hops max, 60 byte packets
+# 数据包先到本机网关
+ 1  172.20.5.1 (172.20.5.1)  0.109 ms  0.038 ms  0.032 ms
+ # flannel.1直接给封装通过隧道发送到了对方的flannel上，没有在使用物理机网卡进行封装
+ 2  172.20.3.0 (172.20.3.0)  1.352 ms  3.280 ms  2.386 ms
+ 3  172.20.3.9 (172.20.3.9)  2.787 ms  2.747 ms  2.715 ms
+```
+
+```
+->: pod中产生数据，根据pod的路由信息，将数据发送到Cni0 
+->: Cni0 根据节点的路由表，将数据发送到隧道设备flannel.1 
+->: Flannel.1查看数据包的目的ip，从flanneld获得对端隧道设备的必要信息，封装数据包。 
+->: Flannel.1将数据包发送到对端设备,对端节点的网卡接收到数据包 
+->: 对端节点发现数据包为overlay数据包，解开外层封装，并发送到到本机flannel.1设备。 
+->: Flannel.1设备查看数据包，根据路由表匹配，将数据发送给Cni0设备。 
+->: Cni0匹配路由表，发送数据给网桥上对应的端口(pod)。
+```
+
+
+
+
+
+VxLAN Directrouting: Directrouting 为在同一个二层网络中的node节点启用直接路由机制，类似于host-gw模式。配合vxlan模式提升网络性能
+
+```
+"Type": "vxlan",
+"Directrouting": true
+```
+
+工作区别
+
+```
+数据转发不在使用flannel.1网卡，而是直接使用物理网卡转发。
+```
+
+
+
+
+
+# 证书和RBAC授权
+
+k8s所有的证书都保存在`/etc/kubernets/ssl/`文件夹中
+
+
+
+给用户授权
+
+kubectl create serviceaccount 名字  命名空间
+
+创建授权文件
+
+
+
+签发证书
+
+```
+cfssl  gencert -ca=/etc/kubernetes/ssl/ca.pem 
+```
 
 
 
@@ -2328,8 +3124,4 @@ spec:
 
 
 
-
-
-
-
-# 常见错误
+RBAC
